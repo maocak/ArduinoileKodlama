@@ -1,1 +1,1 @@
-Arduino ile Kodlam: Mikrodenetleyici Uygulamaları kitabında yer olan tüm kodlara buradan ulaşabilirsiniz.
+Arduino ile Kodlama: Mikrodenetleyici Uygulamaları kitabında yer olan tüm kodlara buradan ulaşabilirsiniz.
