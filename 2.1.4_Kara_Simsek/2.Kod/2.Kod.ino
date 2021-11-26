@@ -7,7 +7,7 @@ int led6 = 4;
 int led7 = 3; 
 int led8 = 2; 
 
-const int bekleme = 500; 
+const int bekleme = 50; 
 // Pin numaralarını belirleyecek 8 bitlik bir dizi 
 //oluşturulur.
 int pinDizi[] = {2, 3, 4, 5, 6, 7, 8, 9};
