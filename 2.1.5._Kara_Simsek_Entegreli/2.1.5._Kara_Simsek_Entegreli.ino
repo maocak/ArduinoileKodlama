@@ -39,7 +39,7 @@ void loop() {
 digitalWrite(biteyaz, LOW);
 shiftOut(veripin, tetiklemepin, MSBFIRST, veridizi[sira]);
 digitalWrite(biteyaz, HIGH);
-delay(600);
+delay(100);
 sira++;
 if (sira >= sayac){
 sira = 0;
