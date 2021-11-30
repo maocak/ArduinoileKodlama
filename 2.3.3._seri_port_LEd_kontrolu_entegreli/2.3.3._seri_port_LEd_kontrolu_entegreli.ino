@@ -10,18 +10,18 @@ pinMode(tetiklemepin, OUTPUT);
 pinMode(veripin, OUTPUT);
 Serial.begin(9600); //seri port açılarak 9600 baud da veri iletişimi hazır hale getirilir. 
 while (! Serial); // seriport hazır olana kadar bekler
-Serial.println("0 ile 7 arasında LED numarasını giriniz/x tüm LEDleri söndürür"); //ekrana yazı //yazılır.
+Serial.println("0 ile 7 arasında LED numarasını giriniz/x tüm LEDleri söndürür"); //ekrana yazı yazılır.
 }
  
 void loop() 
 {
-if (Serial.available())//eğer bir karakter girişi olursa ara bellekte hazır tutularak hazır hale //getirilir.
+if (Serial.available())//eğer bir karakter girişi olursa ara bellekte hazır tutularak hazır hale getirilir.
 {
-char deger = Serial.read();//okunup arabellekte tutulan karakter deger isminde değişkene //atılır.
+char deger = Serial.read();//okunup arabellekte tutulan karakter deger isminde değişkene atılır.
 if (deger >= '0' && deger <= '7')//değer değişkenine 0 ile 7 arasında karakter atandığında 
 // koda işlemeye devam eder.
 {
-int led = deger ; //girilen her karakterden 0 çıkartılarak ASCII karakterine dönüştürülür. 
+int led = deger-'0' ; //girilen her karakterden 0 çıkartılarak ASCII karakterine dönüştürülür. 
 bitSet(ledler, led); // girilen karakter fonksiyona yollanır. 
 kaydirmalikaydedici();
 Serial.print(led);
