@@ -29,7 +29,7 @@ Serial.println(" numaralı LED yandı "); //0-7 arası girilen numaraya göre il
 }
 if ((deger == 'x') or (deger == 'X'))// eğer x karakteri girilirse 
 {
-ledler = 0;
+ledler = 0; //ledler değişkenine tekrar 0 olarak atama yapılır. 
 kaydirmalikaydedici(); //karakter fonksiyona yollanır. 
 Serial.println("LEDler söndü");
 }
@@ -38,7 +38,7 @@ Serial.println("LEDler söndü");
  
 void kaydirmalikaydedici() 
 {
-digitalWrite(biteyaz, LOW);
+digitalWrite(biteyaz, LOW); //her bir LED için önce LOW değeri atanır, LSBFIRST ile seriporttan girilen 0-7 değerine göre LEDler HIGH ile yakılır. 
 shiftOut(veripin, tetiklemepin, LSBFIRST, ledler);
 digitalWrite(biteyaz, HIGH);
 }
