@@ -11,6 +11,7 @@ void setup()
 Serial.begin(9600); //seri veri iletişimi başlatılır. 
 pinMode (ledPin, OUTPUT); //ledpini çıkış olarak tanımlanır. 
 pinMode (buzzerPin, OUTPUT); //buzzer pini çıkış olarak tanımlanır. 
+dht.begin();
 }
 
 void loop() {
@@ -29,7 +30,7 @@ tone(buzzerPin, HIGH);
 else //eğer nem değeri %50'in üstünde ise LED söner ve buzzer susar. 
 {
 digitalWrite(ledPin, LOW);
-tone(buzzerPin, LOW);
+noTone(buzzerPin);
 }
 delay(2000); //sensörden her 2 sn de bir veri okuması yapılır. 
 }
