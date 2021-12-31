@@ -17,8 +17,8 @@ char dugmeler[satirlar][sutunlar] = {
 
 
 
-byte satirpinleri[satirlar] = { 9, 8, 7, 6 }; //tuş takımındaki uçların Arduino UNOya bağlanacak pinleri tanımlanır.  
-byte sutunpinleri[sutunlar] = { 5, 4, 3, 2 };
+byte satirpinleri[satirlar] = { 5, 4, 3, 2 }; //tuş takımındaki uçların Arduino UNOya bağlanacak pinleri tanımlanır.  
+byte sutunpinleri[sutunlar] = { 9, 8, 7, 6 };
 
 Keypad tustakimi = Keypad( makeKeymap(dugmeler), satirpinleri, sutunpinleri, satirlar, sutunlar ); //tuş takımı nesnesi oluşturulur. 
 
