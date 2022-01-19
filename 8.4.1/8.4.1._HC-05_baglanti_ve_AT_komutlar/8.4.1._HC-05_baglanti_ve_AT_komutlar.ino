@@ -10,6 +10,6 @@ void loop()
 {
 if (BTserial.available()) // HC-05'dan okumaya devam eder ve Arduino Seri port ekranına gönderir.
 Serial.write(BTserial.read());
-if (Serial.available())  // Arduino Seri port ekranından okumaya devam eder ve HC-06'ya gönderir.
+if (Serial.available())  // Arduino Seri port ekranından okumaya devam eder ve HC-05'e gönderir.
 BTserial.write(Serial.read());
 }
