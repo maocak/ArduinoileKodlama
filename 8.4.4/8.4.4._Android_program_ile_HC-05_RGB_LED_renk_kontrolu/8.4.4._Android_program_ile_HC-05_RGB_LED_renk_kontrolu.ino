@@ -1,58 +1,72 @@
-#include <SoftwareSerial.h> //kütüphane eklenir. 
+#include <SoftwareSerial.h>  //kütüphaneler eklenir.
+#include <Wire.h>
+SoftwareSerial BTserial(0,1); // RX and TX pins
 int kirmiziLEDpin = 9; //LEDlerin pin numaraları atanır.
 int yesilLEDpin = 10;
 int maviLEDpin = 11;
-SoftwareSerial BTserial(1, 0); //TX, RX pin bağlantıları tanımlanır. 
-String renk; //renk isimli bir değişken string olarak tanımlanır. 
 
-void setup() {
-BTserial.begin(38400); //modülün iletişim hızı belirlenir. 
-pinMode(kirmiziLEDpin, OUTPUT); //kırmızı LED pin çıkış olarak tanımlanır. 
-pinMode(yesilLEDpin, OUTPUT); //yeşil LED pin çıkış olarak tanımlanır. 
-pinMode(maviLEDpin, OUTPUT); //mavi LED pin çıkış olarak tanımlanır. 
-}
-void loop() {
-while (BTserial.available()) { //eğer porttan herhangi bir veri girişi olursa...
-delay(10); // biraz beklenir
-char c = BTserial.read(); //modülden seri iletişim okunur ve c isimli değişkene atanır. 
-renk += c ; //"kırmızı, yeşil ve mavi"  girişleri string olarak tanımlanır. 
-}
-if (renk.length() > 0) { //eğer modülün portundan gelen değer kırmızı ise(kırmızı butona basılırsa)...
-if (renk == "red")
+String RGB = "";
+String RGB_onceki = "255.255.255";
+String ON = "ON";
+String OFF = "OFF";
+boolean RGB_tamam = false;
+
+void setup()
 {
-digitalWrite(kirmiziLEDpin, LOW);  //kırmızı LED yanar...
-digitalWrite(yesilLEDpin, HIGH);
-digitalWrite(maviLEDpin, HIGH);
-delay(20);
+pinMode (kirmiziLEDpin, OUTPUT); //kırmızı LED pin çıkış olarak tanımlanır.
+pinMode (yesilLEDpin, OUTPUT);   //yeşil LED pin çıkış olarak tanımlanır.
+pinMode (maviLEDpin, OUTPUT);    //mavi LED pin çıkış olarak tanımlanır. 
+Serial.begin(9600); //modülün iletişim hızı belirlenir.
+BTserial.begin(38400);
+RGB.reserve(30);
 }
-else if (renk == "green")  //eğer yeşil butona basılırsa...
+
+void loop()
 {
-digitalWrite(kirmiziLEDpin, HIGH); //yeşil LED yanar. 
-digitalWrite(yesilLEDpin, LOW);
-digitalWrite(maviLEDpin, HIGH);
-delay(20);
-}
-else if (renk == "blue")  //eğer mavi butona basılırsa...
+while(BTserial.available())  //eğer porttan herhangi bir veri girişi olursa...
 {
-digitalWrite(kirmiziLEDpin, HIGH);  //mavi LED yanar.
-digitalWrite(yesilLEDpin, HIGH);
-digitalWrite(maviLEDpin, LOW);
-delay(20);
-}
-else if (renk == "stop") //eğer stop butonuna basılırsa...
+char c = (char)BTserial.read();  //modülden seri iletişim okunur ve c isimli değişkene atanır.
+if(c == ')')
 {
-digitalWrite(kirmiziLEDpin, HIGH);  //tüm LEDler söner...
-digitalWrite(yesilLEDpin, HIGH);
-digitalWrite(maviLEDpin, HIGH);
-delay(20);
+RGB_tamam = true;
+}else{
+RGB += c;
 }
-else if (renk == "fader")  //eğer Fader butonuna basılırsa...
+}
+if(RGB_tamam)
 {
-analogWrite(kirmiziLEDpin, random(0,255)); //0-255 arası kırmızı, yeşil ve mavi renkte gelişigüzel renk ataması yapılır. 
-analogWrite(yesilLEDpin, random(0,255));
-analogWrite(maviLEDpin, random(0,255));
-delay(250); //fader butonuna her basıldığında biraz bekler ve renk değişimi olur. 
+Serial.print("RGB LED değeri:");
+Serial.println(RGB);
+if(RGB==ON)
+{
+RGB = RGB_onceki;
+RGB_LED();
 }
-renk = ""; //değişken sıfırlanır.
+else if(RGB==OFF)
+{
+RGB = "0.0.0";
+RGB_LED();
+}else{
+RGB_LED();
+RGB_onceki = RGB;
 }
+RGB = "";
+RGB_tamam = false;
+}
+}
+void RGB_LED()
+{
+int SP1 = RGB.indexOf(' ');
+int SP2 = RGB.indexOf(' ', SP1+1);
+int SP3 = RGB.indexOf(' ', SP2+1);
+String R = RGB.substring(0, SP1);
+String G = RGB.substring(SP1+1, SP2);
+String B = RGB.substring(SP2+1, SP3);
+//Kullandığınız RGB'in ortak anot ya da ortak katot olma durumuna göre...
+//analogWrite(kirmiziLEDpin, (R.toInt()));//eğer renkler ters çalışırsa aktif hale getirin 
+//analogWrite(yesilLEDpin, (G.toInt()));//ve aşağıdaki 3 satırı pasif yapın...
+//analogWrite(maviLEDpin, (B.toInt()));
+analogWrite(kirmiziLEDpin, (255-R.toInt()));//eğer renkler ters çalışırsa aktif hale getirin...
+analogWrite(yesilLEDpin, (255-G.toInt()));//ve yukardaki 3 satırı pasif yapın...
+analogWrite(maviLEDpin, (255-B.toInt()));
 }
