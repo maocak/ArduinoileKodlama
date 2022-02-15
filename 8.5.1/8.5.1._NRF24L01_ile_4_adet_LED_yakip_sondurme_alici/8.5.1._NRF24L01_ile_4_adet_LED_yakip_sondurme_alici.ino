@@ -5,10 +5,10 @@ boolean degisken; //degisken adlı bir değişken tanımlanır.
 int mesaj[1]; //mesaj isminde bir dizi tanımlanır. 
 RF24 verici(9,10); //CE ve CSN pinleri tanımlanır. 
 const uint64_t veriadresi = 0xE8E8F0F0E1LL; //veri alışverişi yapılacak adres yolu atanır.
-int kirmiziLEDpin =3; //LEDler için pin atamaları yapılır. 
-int yesilLEDpin =4;
+int kirmiziLEDpin =7; //LEDler için pin atamaları yapılır. 
+int yesilLEDpin =6;
 int sariLEDpin =5;
-int beyazLEDpin =6;
+int beyazLEDpin =4;
 
 void setup()
 {
