@@ -6,7 +6,7 @@
 #include <LCD.h>
 #include <LiquidCrystal_I2C.h>
 
-LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE); //I2C LCD pin uçları tanımlanır.
+LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE); //I2C LCD pin uçları tanımlanır.
 // (I2C Adres, Enable_pin, Rw_pin, Rs_pin, d4, d5, d6, d7, arkaışık_pin, polarite)
 
 float deger[2]; //2 elemanlı değer isimli bir dizi tanımlanır. 
