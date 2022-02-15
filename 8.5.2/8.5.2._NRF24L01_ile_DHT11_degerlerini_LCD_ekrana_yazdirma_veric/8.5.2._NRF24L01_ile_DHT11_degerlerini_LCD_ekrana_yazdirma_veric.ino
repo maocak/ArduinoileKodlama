@@ -4,7 +4,7 @@
 #include <DHT.h>
 
 #define DHTPIN 3 //DHT11 in bağlanacağı pin numarası tanımlanır. 
-#define DHTTYPE DHT11//kullanılacak sensör türü DHT11 olarak atanır. Kütüphane aynı zamanda DHT22 içinde çalıştığı için bunu belirtmemiz gerekir.
+#define DHTTYPE DHT11 //kullanılacak sensör türü DHT11 olarak atanır. Kütüphane aynı zamanda DHT22 içinde çalıştığı için bunu belirtmemiz gerekir.
 //Eğer DHT22 kullanılırsa kod #define DHTTYPE DHT22 şeklinde olmalıdır. 
 DHT dht(DHTPIN,DHTTYPE, 20);//pin çıkışı ve türü tanımlanan DHT sensörü başlatılır. 
 
@@ -17,6 +17,7 @@ void setup(void) {
 Serial.begin(9600); //seri veri iletişimi başlatılır. 
 verici.begin();  //NRF24L01 başlatılır. 
 verici.openWritingPipe(veriadresi); //verileri yazmak için veriadresi yolu açılır.
+dht.begin();
 }
 
 void loop(void)
@@ -26,7 +27,8 @@ float sicaklik = dht.readTemperature();//sensörden okunan sıcaklık değeri si
 
 deger[0] = sicaklik; //dizinin 1.elemanına sıcaklık değeri atanır. 
 deger[1] = nem;  //dizinin 2.elemanına nem değeri atanır. 
-Serial.println(deger[0]); //okunan veri seri port ekrana yazdırılır. 
+Serial.print(deger[0]); //okunan veri seri port ekrana yazdırılır. 
+Serial.print(" ");
 Serial.println(deger[1]);
 verici.write(deger, sizeof(deger)); //dizinin elemanları olarak veri yollanır. 
 
