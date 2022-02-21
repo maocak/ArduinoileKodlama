@@ -10,15 +10,15 @@ Serial.begin(9600); //Seri veri iletişimi başlatılır.
 pinMode(enApin, OUTPUT); //Enable A pini çıkış olarak tanımlanır. 
 pinMode(in1pin, OUTPUT); //Input1 pini çıkış olarak tanımlanır. 
 pinMode(in2pin, OUTPUT); //Input2 pini çıkış olarak tanımlanır. 
-pinMode(buttonpin, INPUT_PULLUP); //Butonpin çıkış olarak tanımlanır. 
+pinMode(butonpin, INPUT_PULLUP); //Butonpin çıkış olarak tanımlanır. 
 // DC motorun ilk dönme yönü belirleninr(motor sola doğru döner)
-digitalWrite(in1, LOW);
-digitalWrite(in2, HIGH);
+digitalWrite(in1pin, LOW);
+digitalWrite(in2pin, HIGH);
 }
 
 void loop() {
 int potdeger = analogRead(A0); //  AO dan okunan değer potdeger e atanır. 
-int pwmdeger = map(potValue, 0, 1023, 0 , 255); // 0-1023 arası analod deger 0-255 arası PWM değere dönüştürülür. 
+int pwmdeger = map(potdeger, 0, 1023, 0 , 255); // 0-1023 arası analod deger 0-255 arası PWM değere dönüştürülür. 
 Serial.println(pwmdeger); //motorun dönme hızını belirleyen değer seri port ekrana yazdırılır. 
 analogWrite(enApin, pwmdeger); // pot ile belirlenen PWM sinyali(degeri) enA(enable pin)e yollanır. 
 // buton değeri okunur
@@ -29,15 +29,15 @@ while (digitalRead(butonpin) == true); //Buton pine true değeri geldiğinde...
 delay(20); //biraz beklenir. 
 // Eğer butona basılır ve donmeyonu ilk değer devam ederse...
 if (butonbasma == true  & donmeyonu == 0) { 
-digitalWrite(in1, HIGH); //motorun dönme yönü değiştirilir.
-digitalWrite(in2, LOW);
+digitalWrite(in1pin, HIGH); //motorun dönme yönü değiştirilir.
+digitalWrite(in2pin, LOW);
 donmeyonu = 1; //donmeyonune 1  atanır. 
 delay(20); //biraz beklenir. 
 }
 // Eğer butona basılırsa ve donmeyonu 1 değeri alırsa...
-if (pressed == false & rotDirection == 1) {
-digitalWrite(in1, LOW);  //motorun dönme yönü tekrar değişir. 
-digitalWrite(in2, HIGH);
+if (butonbasma == false & donmeyonu == 1) {
+digitalWrite(in1pin, LOW);  //motorun dönme yönü tekrar değişir. 
+digitalWrite(in2pin, HIGH);
 donmeyonu = 0; //donmeyonu 0 atanır. 
 delay(20); //biraz beklenir. 
 }
