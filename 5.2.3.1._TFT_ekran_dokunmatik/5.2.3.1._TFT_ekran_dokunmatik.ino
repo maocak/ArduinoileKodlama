@@ -1,145 +1,188 @@
-#include <Adafruit_GFX.h>    // Temel grafik kütüphanesi
-#include <SWTFT.h> // Donanıma özel kütüphane
-#include <TouchScreen.h>  //Dokunmatik ekran kütüphanesi
+#include <MCUFRIEND_kbv.h>
+MCUFRIEND_kbv tft;       
+#include <TouchScreen.h>
 
-//TFT kalkan için kullanılan pin tanımlamaları. 
-#define YP A2  // Yplus, analog pin olmalıdır. 
-#define XM A1  // Xminimum, analog pin olmalıdır. 
-#define YM 6   // Yminimum, dijital pin olmalıdır. 
-#define XP 7   // Xplus, dijital pin olmalıdır. 
+char *name = "TFT ekran 2.4,ID:9325";  //kalkanın durumuna göre edit edilebilir.
+const int XP=6,XM=A2,YP=A1,YM=7; //ID=0x9325
+const int TS_LEFT=907,TS_RT=136,TS_TOP=942,TS_BOT=139;
 
-//Dokunmatik ekran için Minimum ve Maksimum X ve Y değerleri/kalibrasyon değerleri atanır.
-#define TS_MINX 150
-#define TS_MINY 120
-#define TS_MAXX 920
-#define TS_MAXY 940
+TouchScreen ts = TouchScreen(XP, YP, XM, YM, 534);
+TSPoint tp;
 
-// Daha iyi basınç hassasiyeti X + ve X- arasında direnci bilmemiz gerekir. Multimetre kullanarak bu değer ölçülmektedir. 
-// Bu uygulama için kullanılan TFT ekranın X değerleri arasındaki direnç 534R olarak ölçülmektedir. 
-TouchScreen ts = TouchScreen(XP, YP, XM, YM, 534); //Dokunmatik ekran kütüphanesini kullanmak için, ilk olarak bir Dokunmatik ekran nesnesi oluşturulur.
+#define MINPRESSURE 10
+#define MAXPRESSURE 1000
 
-// 16 bit renk değerlerine atamalar yapılmıştır. 
-#define	SIYAH     0x0000
-#define	MAVI      0x001F
-#define	KIRMIZI   0xF800
-#define	YESIL     0x07E0
-#define CAMGOBEGI 0x07FF
-#define PEMBE     0xF81F
-#define SARI      0xFFE0
-#define BEYAZ     0xFFFF
+int16_t BOXSIZE;
+int16_t PENRADIUS = 2; //daha ince ya da daha kalın yazın için 1 ya da 3 kullanın.
+uint16_t ID, oldcolor, currentcolor;
+uint8_t Orientation = 0;    //PORTRAIT, LANDSCAPE özelliği için 1 kullanın.
 
 
-SWTFT tft;
+#define BLACK   0x0000
+#define BLUE    0x001F
+#define RED     0xF800
+#define GREEN   0x07E0
+#define CYAN    0x07FF
+#define MAGENTA 0xF81F
+#define YELLOW  0xFFE0
+#define WHITE   0xFFFF
 
-int eskirenk, yenirenk;
+void show_Serial(void)
+{
+    Serial.println(F("Çoğu dokunmatik ekranlar 6, 7, A1, A2 pinlerini kullanır."));
+    Serial.println(F("Ancak bu pinler, herhangi bir sırada olabilir."));
+    Serial.println(F("Örneğin, sağdan sola, yada aşağıdan yukarı"));
+    Serial.println(F("ya da yanlış koordinat"));
+    Serial.println(F("Kullanılan TFT ekran çeşidine göre düzenleme ve güncelleme yapınız\n"));
+    Serial.println(name);
+    Serial.print(F("ID=0x"));
+    Serial.println(ID, HEX);
+    Serial.println("Ekran " + String(tft.width()) + "x" + String(tft.height()));
+    Serial.println("Kalibrasyon: ");
+    Serial.println("SOL = " + String(TS_LEFT) + " SAĞ  = " + String(TS_RT));
+    Serial.println("YUKARI  = " + String(TS_TOP)  + " AŞAĞI = " + String(TS_BOT));
+    Serial.println("Kablolama, daima PORTRAIT");
+    Serial.println("YP=" + String(YP)  + " XM=" + String(XM));
+    Serial.println("YM=" + String(YM)  + " XP=" + String(XP));
+}
 
-#define kutuboyut 40  //boxsize değeri olarak 40 atanır. 
-#define yaricap 3 //penradius değeri olarak 3 atanır. 
-
-
-#define minbasincdeger 10 //ekrana uygulanan minimum basınç değeri 10 atanır. 
-#define maksbasincdeger 1000  //maksimum basınç değeeri 1000 atanır. 
-
-void setup(void) {
-  
-Serial.begin(9600);
-Serial.println(F("Boyama yapabilirsin!")); 
-  
-tft.reset(); //TFT ekran sıfırlanır. 
-  
-uint16_t identifier = tft.readID();//TFT ekranın sürücü numarası okunur. 
-
-Serial.print(F("TFT LCD sürücü seri numarası: ")); //okunan numara ekrana yazdırılır. 
-Serial.println(identifier, HEX); //Hexedecimal 
-    
-
-tft.begin(identifier); //TFT ekran başlatılır. 
-
-tft.fillScreen(SIYAH);  //TFT ekran siyah yapılır. 
-
-//x,y koordinatında, genişlik ve yüksekliği 40*40 olan ve 5 çeşit içi dolu kutucuk ekranın sol kenarına çizdirilir. 
-tft.fillRect(0, 0, kutuboyut, kutuboyut, KIRMIZI);  //kırmızı kutucuk
-tft.fillRect(kutuboyut, 0, kutuboyut, kutuboyut, SARI); //sarı kutucuk
-tft.fillRect(kutuboyut*2, 0, kutuboyut, kutuboyut, YESIL);  //yeşil kutucuk
-tft.fillRect(kutuboyut*3, 0, kutuboyut, kutuboyut, CAMGOBEGI);  //camgöbeği rengi kutucuk
-tft.fillRect(kutuboyut*4, 0, kutuboyut, kutuboyut, MAVI);  //mavi kutucuk
-tft.fillRect(kutuboyut*5, 0, kutuboyut, kutuboyut, PEMBE);  //macenta rengi kutucuk
-  // tft.fillRect(kutuboyut*6, 0, kutuboyut, kutuboyut, BEYAZ);
- 
-tft.drawRect(0, 0, kutuboyut, kutuboyut, BEYAZ); //kırmızı kutunun çevresine beyaz renk çizgi çekilir. 
-yenirenk = KIRMIZI; //kırmızı kutu seçilir. 
- 
-pinMode(13, OUTPUT); //13 nolu pin çıkış olaran tanımlanır. 
+void show_tft(void)
+{
+    tft.setCursor(0, 0);
+    tft.setTextSize(1);
+    tft.print(F("ID=0x"));
+    tft.println(ID, HEX);
+    tft.println("Ekran " + String(tft.width()) + "x" + String(tft.height()));
+    tft.println("");
+    tft.setTextSize(2);
+    tft.println(name);
+    tft.setTextSize(1);
+    tft.println("PORTRAIT Degerleri:");
+    tft.println("SOL = " + String(TS_LEFT) + " SAG  = " + String(TS_RT));
+    tft.println("YUKARI  = " + String(TS_TOP)  + " ASAGI = " + String(TS_BOT));
+    tft.println("\nKablolama: ");
+    tft.println("YP=" + String(YP)  + " XM=" + String(XM));
+    tft.println("YM=" + String(YM)  + " XP=" + String(XP));
+    tft.setTextSize(2);
+    tft.setTextColor(RED);
+    tft.setCursor((tft.width() - 48) / 2, (tft.height() * 2) / 4);
+    tft.print("CIKIS");
+    tft.setTextColor(YELLOW, BLACK);
+    tft.setCursor(0, (tft.height() * 6) / 8);
+    tft.print("loc icin dokunmatik ekran");
+    while (1) {
+        tp = ts.getPoint();
+        pinMode(XM, OUTPUT);
+        pinMode(YP, OUTPUT);
+        if (tp.z < MINPRESSURE || tp.z > MAXPRESSURE) continue;
+        if (tp.x > 450 && tp.x < 570  && tp.y > 450 && tp.y < 570) break;
+        tft.setCursor(0, (tft.height() * 3) / 4);
+        tft.print("tp.x=" + String(tp.x) + " tp.y=" + String(tp.y) + "   ");
+    }
 }
 
 
+void setup(void)
+{
+    uint16_t tmp;
+
+    tft.reset();
+    ID = tft.readID();
+    tft.begin(ID);
+    Serial.begin(9600);
+    show_Serial();
+    tft.setRotation(Orientation);
+    tft.fillScreen(BLACK);
+    show_tft();
+
+    BOXSIZE = tft.width() / 6;
+    tft.fillScreen(BLACK);
+
+    tft.fillRect(0, 0, BOXSIZE, BOXSIZE, RED);
+    tft.fillRect(BOXSIZE, 0, BOXSIZE, BOXSIZE, YELLOW);
+    tft.fillRect(BOXSIZE * 2, 0, BOXSIZE, BOXSIZE, GREEN);
+    tft.fillRect(BOXSIZE * 3, 0, BOXSIZE, BOXSIZE, CYAN);
+    tft.fillRect(BOXSIZE * 4, 0, BOXSIZE, BOXSIZE, BLUE);
+    tft.fillRect(BOXSIZE * 5, 0, BOXSIZE, BOXSIZE, MAGENTA);
+
+    tft.drawRect(0, 0, BOXSIZE, BOXSIZE, WHITE);
+    currentcolor = RED;
+    delay(1000);
+}
 
 void loop()
 {
-digitalWrite(13, HIGH);
-// Tanımlanan bir nokta nesnesi x y ve z koordinatlarını tutar 
-// Eğer dokunmatik ekran kütüphanesinin ilk sürümleri kullanılırsa //içindeki komut denenmelidir. 
-//  Point p = ts.getPoint();
-TSPoint p = ts.getPoint(); //p nokta nesnesi
-digitalWrite(13, LOW);
-
-// TFT kalkanda kullanılan pin numaraları çıkış olarak tanımlanır. 
-pinMode(XP, OUTPUT);
-pinMode(XM, OUTPUT);
-pinMode(YP, OUTPUT);
-pinMode(YM, OUTPUT);
-
-if (p.z > minbasincdeger && p.z < maksbasincdeger) { //eğer ekrana uygulanan basınç değeri 10 ile 1000 arasında ise
-   
-Serial.print("X koordinatı= "); Serial.print(p.x); //seri port ekranına x değeri yazdırılır. 
-Serial.print("\tY koordinatı = "); Serial.print(p.y);  //y değeri yazdırılır. 
-Serial.print("\tEkrana uygulanan basınç = "); Serial.println(p.z); //uygulanan basınç değeri yazdırılır. 
-
+    uint16_t xpos, ypos;  //dokunmatik ekran koordinatları. 
+    tp = ts.getPoint();   
     
-if (p.y < (TS_MINY-5)) {
-Serial.println("Ekran silindi");
-// Ekranı silmek için ekranın altında bulunan düğmeye basılır. 
-tft.fillRect(0, kutuboyut, tft.width(), tft.height()-kutuboyut, SIYAH); //ekran silindikten sonra tekrar siyahla doldurulur.
-}
-// p nesnesinin x ve y koordinat değerleri belirlenir. 
-p.x = tft.width()-(map(p.x, TS_MINX, TS_MAXX, tft.width(), 0));
-p.y = tft.height()-(map(p.y, TS_MINY, TS_MAXY, tft.height(), 0));
-   
-if (p.y < kutuboyut) { //eğer p nesnesinin y değeri 40 tan küçükse
-eskirenk = yenirenk; //eski renk değişkenine yeni renk değişkeni atanır. 
+    pinMode(XP, OUTPUT);
+    pinMode(XM, OUTPUT);
+    pinMode(YP, OUTPUT);
+    pinMode(YM, OUTPUT);
+  
 
-if (p.x < kutuboyut) { //x değeri 40 tan küçükse
-yenirenk = KIRMIZI; //kırmızı renk atanır. 
-tft.drawRect(0, 0, kutuboyut, kutuboyut, BEYAZ); //kırmızı kutucuk çevresi beyaz kare içine alınır. 
-} else if (p.x < kutuboyut*2) { //x değeri 80 ten küçükse...
-yenirenk = SARI; //sarı renk atanır. 
-tft.drawRect(kutuboyut, 0, kutuboyut, kutuboyut, BEYAZ); //sarı kutucuk çevresi beyaz kare içine alınır. 
-} else if (p.x < kutuboyut*3) {  //x değeri 120 ten küçükse...
-yenirenk = YESIL; //yeşil renk atanır. 
-tft.drawRect(kutuboyut*2, 0, kutuboyut, kutuboyut, BEYAZ); //yeşil kutucuk çevresi beyaz kare içine alınır.
-} else if (p.x < kutuboyut*4) {  //x değeri 160 ten küçükse...
-yenirenk = CAMGOBEGI;  //cam göbeği rengi atanır. 
-tft.drawRect(kutuboyut*3, 0, kutuboyut, kutuboyut, BEYAZ);  //cam göbeği kutucuk çevresi beyaz kare içine alınır.
-} else if (p.x < kutuboyut*5) {  //x değeri 200 ten küçükse...
-yenirenk = MAVI;  //mavi renk atanır. 
-tft.drawRect(kutuboyut*4, 0, kutuboyut, kutuboyut, BEYAZ);  //mavi kutucuk çevresi beyaz kare içine alınır.
-} else if (p.x < kutuboyut*6) {  //x değeri 240 tan küçükse...
-yenirenk = PEMBE;  //PEMBE renk atanır.
-tft.drawRect(kutuboyut*5, 0, kutuboyut, kutuboyut, BEYAZ);  //PEMBE kutucuk çevresi beyaz kare içine alınır.
-}
-//eğer yeni bir renk seçilmezse beyaz kutu çerçeve eski rengin etrafında kalır. 
-if (eskirenk != yenirenk) {
-if (eskirenk == KIRMIZI) tft.fillRect(0, 0, kutuboyut, kutuboyut, KIRMIZI);
-if (eskirenk == SARI) tft.fillRect(kutuboyut, 0, kutuboyut, kutuboyut, SARI);
-if (eskirenk == YESIL) tft.fillRect(kutuboyut*2, 0, kutuboyut, kutuboyut, YESIL);
-if (eskirenk == CAMGOBEGI) tft.fillRect(kutuboyut*3, 0, kutuboyut, kutuboyut, CAMGOBEGI);
-if (eskirenk == MAVI) tft.fillRect(kutuboyut*4, 0, kutuboyut, kutuboyut, MAVI);
-if (eskirenk == PEMBE) tft.fillRect(kutuboyut*5, 0, kutuboyut, kutuboyut, PEMBE);
-}
-}
-if (((p.y-yaricap) > kutuboyut) && ((p.y+yaricap) < tft.height())) {
-//ekranda seçilen renkte x ve y koordinatına göre yarıçapı 3 olan daire şeklinde noktalar yardımıyla çizimler yapılabilir. 
-tft.fillCircle(p.x, p.y, yaricap, yenirenk);
-}
-}
+    if (tp.z > MINPRESSURE && tp.z < MAXPRESSURE) {
+     
+        switch (Orientation) {
+            case 0:
+                xpos = map(tp.x, TS_LEFT, TS_RT, 0, tft.width());
+                ypos = map(tp.y, TS_TOP, TS_BOT, 0, tft.height());
+                break;
+            case 1:
+                xpos = map(tp.y, TS_TOP, TS_BOT, 0, tft.width());
+                ypos = map(tp.x, TS_RT, TS_LEFT, 0, tft.height());
+                break;
+            case 2:
+                xpos = map(tp.x, TS_RT, TS_LEFT, 0, tft.width());
+                ypos = map(tp.y, TS_BOT, TS_TOP, 0, tft.height());
+                break;
+            case 3:
+                xpos = map(tp.y, TS_BOT, TS_TOP, 0, tft.width());
+                ypos = map(tp.x, TS_LEFT, TS_RT, 0, tft.height());
+                break;
+        }
+
+       
+        if (ypos < BOXSIZE) {               //renk kutucukların etrafına beyaz çizgi çeker.
+            oldcolor = currentcolor;
+
+            if (xpos < BOXSIZE) {
+                currentcolor = RED;
+                tft.drawRect(0, 0, BOXSIZE, BOXSIZE, WHITE);
+            } else if (xpos < BOXSIZE * 2) {
+                currentcolor = YELLOW;
+                tft.drawRect(BOXSIZE, 0, BOXSIZE, BOXSIZE, WHITE);
+            } else if (xpos < BOXSIZE * 3) {
+                currentcolor = GREEN;
+                tft.drawRect(BOXSIZE * 2, 0, BOXSIZE, BOXSIZE, WHITE);
+            } else if (xpos < BOXSIZE * 4) {
+                currentcolor = CYAN;
+                tft.drawRect(BOXSIZE * 3, 0, BOXSIZE, BOXSIZE, WHITE);
+            } else if (xpos < BOXSIZE * 5) {
+                currentcolor = BLUE;
+                tft.drawRect(BOXSIZE * 4, 0, BOXSIZE, BOXSIZE, WHITE);
+            } else if (xpos < BOXSIZE * 6) {
+                currentcolor = MAGENTA;
+                tft.drawRect(BOXSIZE * 5, 0, BOXSIZE, BOXSIZE, WHITE);
+            }
+
+            if (oldcolor != currentcolor) { 
+                if (oldcolor == RED) tft.fillRect(0, 0, BOXSIZE, BOXSIZE, RED);
+                if (oldcolor == YELLOW) tft.fillRect(BOXSIZE, 0, BOXSIZE, BOXSIZE, YELLOW);
+                if (oldcolor == GREEN) tft.fillRect(BOXSIZE * 2, 0, BOXSIZE, BOXSIZE, GREEN);
+                if (oldcolor == CYAN) tft.fillRect(BOXSIZE * 3, 0, BOXSIZE, BOXSIZE, CYAN);
+                if (oldcolor == BLUE) tft.fillRect(BOXSIZE * 4, 0, BOXSIZE, BOXSIZE, BLUE);
+                if (oldcolor == MAGENTA) tft.fillRect(BOXSIZE * 5, 0, BOXSIZE, BOXSIZE, MAGENTA);
+            }
+        }
+       
+        if (((ypos - PENRADIUS) > BOXSIZE) && ((ypos + PENRADIUS) < tft.height())) {
+            tft.fillCircle(xpos, ypos, PENRADIUS, currentcolor);
+        }
+     
+        if (ypos > tft.height() - 10) {
+           
+            tft.fillRect(0, BOXSIZE, tft.width(), tft.height() - BOXSIZE, BLACK);
+        }
+    }
 }
