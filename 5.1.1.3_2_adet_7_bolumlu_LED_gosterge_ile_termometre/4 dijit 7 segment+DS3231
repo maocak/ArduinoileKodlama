@@ -1,0 +1,80 @@
+#include <Wire.h>
+#include <RTClib.h>
+#include "SevSeg.h"
+
+SevSeg sevseg;
+RTC_DS3231 rtc;
+
+unsigned long sonOkumaZamani = 0;
+
+void setup() {
+  byte numDigits = 4; // 4 haneli ekran
+  byte digitPins[] = {2, 3, 4, 5}; // D1, D2, D3, D4 pinleri
+  byte segmentPins[] = {6, 7, 8, 9, 10, 11, 12, 13}; // A, B, C, D, E, F, G, DP pinleri
+  
+  bool resistorsOnSegments = true; // Dirençler segment pinlerine (A-DP) bağlı
+  
+  // Ekran tipiniz Ortak Katot ise COMMON_CATHODE, Ortak Anot ise COMMON_ANODE seçin
+  byte hardwareConfig = COMMON_CATHODE; 
+  
+  bool updateWithDelays = false; 
+  bool leadingZeros = true; // Saat 09:05 ise baştaki 0 görünsün
+  bool disableDecPoint = false; // Nokta (DP) pini aktif
+
+  sevseg.begin(hardwareConfig, numDigits, digitPins, segmentPins, resistorsOnSegments,
+               updateWithDelays, leadingZeros, disableDecPoint);
+  sevseg.setBrightness(90);
+
+  // DS3231 Başlatma
+  if (!rtc.begin()) {
+    while (1); // Saat modülü bulunamazsa dur
+  }
+
+  // ZAMANI BURADAN MANUEL GİRİN:
+  // Format: DateTime(Yıl, Ay, Gün, Saat, Dakika, Saniye)
+  rtc.adjust(DateTime(2026, 11, 11, 21, 23, 0));
+}
+
+void loop() {
+  // Ekran titremesin diye verileri 250 milisaniyede bir okuruz
+  if (millis() - sonOkumaZamani >= 250) {
+    sonOkumaZamani = millis();
+    
+    DateTime now = rtc.now();
+    
+    // 10 saniyelik toplam döngü:
+    // 0-4sn: Saat | 4-6sn: Gün.Ay | 6-8sn: Yıl | 8-10sn: Sıcaklık
+    unsigned long donguZamani = millis() % 10000;
+
+    if (donguZamani < 4000) {
+      // 1. SAAT GÖSTERİMİ (İlk 4 saniye)
+      int saatVeDakika = (now.hour() * 100) + now.minute();
+      
+      if (now.second() % 2 == 0) {
+        sevseg.setNumber(saatVeDakika, 2); // Noktayı yak
+      } else {
+        sevseg.setNumber(saatVeDakika, -1); // Noktayı söndür
+      }
+    } 
+    else if (donguZamani < 6000) {
+      // 2. GÜN VE AY GÖSTERİMİ (4 - 6. saniye arası)
+      int gunVeAy = (now.day() * 100) + now.month();
+      sevseg.setNumber(gunVeAy, 2); 
+    }
+    else if (donguZamani < 8000) {
+      // 3. YIL GÖSTERİMİ (6 - 8. saniye arası - Örn: 2026)
+      sevseg.setNumber(now.year(), -1); // Noktasız 4 haneli yıl
+    }
+    else {
+      // 4. KÜSURATLI SICAKLIK GÖSTERİMİ (8 - 10. saniye arası - Örn: 24.5)
+      // Sıcaklığı 10 ile çarpıp tam sayıya çeviriyoruz (24.5 -> 245) ve sondan 1. haneye nokta koyuyoruz
+      int sicaklikOndalik = round(rtc.getTemperature() * 10);
+      sevseg.setNumber(sicaklikOndalik, 1); 
+    }
+  }
+
+  // Ekranın düzgün görünmesi için bu fonksiyon her döngüde kesintisiz çalışmalıdır
+  sevseg.refreshDisplay(); 
+}
+
+
