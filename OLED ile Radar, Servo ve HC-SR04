@@ -1,0 +1,139 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Servo.h>
+
+// OLED Ekran Ayarları
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// Pin Tanımlamaları
+const int trigPin = 9;
+const int echoPin = 10;
+const int servoPin = 11;
+
+// Radar Ayarları
+const int maxDistance = 40; // Maksimum algılama menzili (cm)
+const int centerX = 64;     // Radar merkez X koordinatı
+const int centerY = 63;     // Radar merkez Y koordinatı
+const int maxRadius = 52;   // Ekrandaki radar yarıçapı (piksel)
+
+Servo radarServo;
+int currentAngle = 15;
+int step = 2; // Tarama hızı (derece adımı)
+
+// Son tespit edilen noktaları hafızada tutmak için dizi
+int distances[181];
+
+void setup() {
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  
+  radarServo.attach(servoPin);
+  radarServo.write(currentAngle);
+
+  // OLED başlatma (Adres genelde 0x3C'dir, çalışmazsa 0x3D yapın)
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    for (;;); // Ekran bulunamazsa döngüyü durdur
+  }
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(25, 28);
+  display.println("RADAR BASLIYOR");
+  display.display();
+  delay(1500);
+
+  // Mesafe dizisini sıfırla
+  for (int i = 0; i <= 180; i++) {
+    distances[i] = 0;
+  }
+}
+
+void loop() {
+  // Servoyu hareket ettir ve sensörün oturması için kısa bekle
+  radarServo.write(currentAngle);
+  delay(25);
+
+  // Mesafeyi ölç ve kaydet
+  int dist = measureDistance();
+  distances[currentAngle] = dist;
+
+  // Ekranı güncelle
+  drawRadar(currentAngle, dist);
+
+  // Açıyı güncelle (15 ile 165 derece arası gidip gel)
+  currentAngle += step;
+  if (currentAngle >= 165 || currentAngle <= 15) {
+    step = -step;
+  }
+}
+
+// HC-SR04 ile mesafe ölçüm fonksiyonu
+int measureDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // 40cm için maksimum yankı süresi ~2500us (zaman aşımı ekleyerek kodu hızlandırıyoruz)
+  long duration = pulseIn(echoPin, HIGH, 4000);
+  if (duration == 0) return 0; // Menzil dışı
+
+  int cm = duration * 0.034 / 2;
+  if (cm > maxDistance) return 0;
+  return cm;
+}
+
+// Radar arayüzünü ve tespitleri çizen fonksiyon
+void drawRadar(int angle, int distance) {
+  display.clearDisplay();
+
+  // 1. Üst Bilgi Metinleri (Açı ve Mesafe)
+  display.setCursor(0, 0);
+  display.print("Aci:");
+  display.print(angle);
+  display.print((char)247); // Derece sembolü
+
+  display.setCursor(74, 0);
+  display.print("Msf:");
+  if (distance > 0) {
+    display.print(distance);
+    display.print("cm");
+  } else {
+    display.print("--");
+  }
+
+  // 2. Radar Yayları (Mesafe halkaları) ve Taban Çizgisi
+  display.drawLine(centerX - maxRadius, centerY, centerX + maxRadius, centerY, SSD1306_WHITE);
+  display.drawCircle(centerX, centerY, maxRadius, SSD1306_WHITE);
+  display.drawCircle(centerX, centerY, maxRadius * 0.66, SSD1306_WHITE);
+  display.drawCircle(centerX, centerY, maxRadius * 0.33, SSD1306_WHITE);
+
+  // 3. Önceki Taramalarda Tespit Edilen Nesneleri Çiz
+  for (int a = 15; a <= 165; a += 2) {
+    if (distances[a] > 0 && distances[a] <= maxDistance) {
+      float rad = a * PI / 180.0;
+      int mappedR = map(distances[a], 0, maxDistance, 0, maxRadius);
+      
+      // Ekran koordinatlarında Y yukarı doğru azaldığı için çıkarma yapıyoruz
+      int objX = centerX - cos(rad) * mappedR;
+      int objY = centerY - sin(rad) * mappedR;
+      
+      // Nesneyi küçük bir dolu daire (blip) olarak çiz
+      display.fillCircle(objX, objY, 2, SSD1306_WHITE);
+    }
+  }
+
+  // 4. Anlık Tarama Çizgisini Çiz
+  float currentRad = angle * PI / 180.0;
+  int lineX = centerX - cos(currentRad) * maxRadius;
+  int lineY = centerY - sin(currentRad) * maxRadius;
+  display.drawLine(centerX, centerY, lineX, lineY, SSD1306_WHITE);
+
+  display.display();
+}
