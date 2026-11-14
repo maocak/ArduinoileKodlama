@@ -1,0 +1,274 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// Pin Tanımlamaları
+const byte lm35Pin = A0;
+const byte relayPin = 7;
+const byte buzzerPin = 8;
+const byte btnUpPin = 2;
+const byte btnDownPin = 3;
+const byte btnModePin = 4;
+
+// Termostat ve Alarm Ayarları
+float targetTemp = 25.0;
+const float hysteresis = 0.5;
+const float alarmThreshold = 45.0;
+bool coolingMode = true;
+bool relayState = false;
+bool alarmActive = false;
+bool buzzerBeepState = false;
+
+// Röle tetikleme yönü (Ters çalışırsa false yap)
+const bool relayActiveLow = true;
+
+// Buton durum takibi
+bool lastUpState = HIGH;
+bool lastDownState = HIGH;
+bool lastModeState = HIGH;
+
+// Zamanlayıcılar
+unsigned long lastUpdateTime = 0;
+unsigned long lastAnimTime = 0;
+unsigned long lastAlarmTime = 0;
+bool animFrame = false;
+float currentTemp = 25.0;
+
+// --- 16x16 İKONLAR ---
+const unsigned char PROGMEM warning_icon[] = {
+  0x01, 0x80, 0x03, 0xC0, 0x03, 0xC0, 0x06, 0x60,
+  0x0E, 0x70, 0x0D, 0xB0, 0x19, 0x98, 0x19, 0x98,
+  0x31, 0x8C, 0x31, 0x8C, 0x63, 0xC6, 0x61, 0x86,
+  0xC1, 0x83, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00
+};
+
+const unsigned char PROGMEM fan_frame1[] = {
+  0x03, 0xC0, 0x03, 0xC0, 0x03, 0xC0, 0x01, 0x80,
+  0x01, 0x80, 0x01, 0x80, 0xFC, 0x3F, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFC, 0x3F, 0x01, 0x80, 0x01, 0x80,
+  0x01, 0x80, 0x03, 0xC0, 0x03, 0xC0, 0x03, 0xC0
+};
+
+const unsigned char PROGMEM fan_frame2[] = {
+  0x00, 0x00, 0x38, 0x1C, 0x3C, 0x3C, 0x1E, 0x78,
+  0x0F, 0xF0, 0x07, 0xE0, 0x03, 0xC0, 0x03, 0xC0,
+  0x03, 0xC0, 0x03, 0xC0, 0x07, 0xE0, 0x0F, 0xF0,
+  0x1E, 0x78, 0x3C, 0x3C, 0x38, 0x1C, 0x00, 0x00
+};
+
+const unsigned char PROGMEM flame_frame1[] = {
+  0x01, 0x00, 0x03, 0x00, 0x07, 0x80, 0x07, 0xC0,
+  0x0F, 0xE0, 0x1F, 0xE0, 0x1F, 0xF0, 0x3F, 0xF0,
+  0x3E, 0xF8, 0x7C, 0x78, 0x7C, 0x78, 0x7E, 0xF8,
+  0x3F, 0xF0, 0x1F, 0xE0, 0x0F, 0xC0, 0x03, 0x00
+};
+
+const unsigned char PROGMEM flame_frame2[] = {
+  0x00, 0x80, 0x00, 0xC0, 0x01, 0xE0, 0x03, 0xE0,
+  0x07, 0xF0, 0x07, 0xF8, 0x0F, 0xF8, 0x0F, 0xFC,
+  0x1F, 0x7C, 0x1E, 0x3E, 0x1E, 0x3E, 0x1F, 0x7E,
+  0x0F, 0xFC, 0x07, 0xF8, 0x03, 0xF0, 0x00, 0xC0
+};
+
+const unsigned char PROGMEM flame_idle[] = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x01, 0x80, 0x03, 0xC0,
+  0x03, 0xC0, 0x07, 0xE0, 0x07, 0xE0, 0x03, 0xC0,
+  0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+void setup() {
+  pinMode(relayPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+  pinMode(btnUpPin, INPUT_PULLUP);
+  pinMode(btnDownPin, INPUT_PULLUP);
+  pinMode(btnModePin, INPUT_PULLUP);
+
+  setRelay(false);
+  digitalWrite(buzzerPin, LOW);
+
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  
+  currentTemp = readTemperature();
+  updateThermostatLogic();
+  drawThermostatUI(currentTemp);
+}
+
+void loop() {
+  bool needsRedraw = handleButtons();
+
+  if (millis() - lastUpdateTime >= 250) {
+    lastUpdateTime = millis();
+    currentTemp = readTemperature();
+    updateThermostatLogic();
+    needsRedraw = true;
+  }
+
+  // 3. Alarm aktifse osilatörü kapatmadan iki ton arası geçiş yap (Pat-pat sesini önler)
+  if (alarmActive) {
+    if (millis() - lastAlarmTime >= 350) {
+      lastAlarmTime = millis();
+      buzzerBeepState = !buzzerBeepState;
+      if (buzzerBeepState) {
+        tone(buzzerPin, 1000); // 1. Ton: 1000 Hz
+      } else {
+        tone(buzzerPin, 750);  // 2. Ton: 750 Hz (noTone yerine ton değiştiriyoruz)
+      }
+      needsRedraw = true;
+    }
+  } else if (buzzerBeepState) {
+    buzzerBeepState = false;
+    noTone(buzzerPin);
+    needsRedraw = true;
+  }
+
+  if (!alarmActive && relayState && (millis() - lastAnimTime >= 120)) {
+    lastAnimTime = millis();
+    animFrame = !animFrame;
+    needsRedraw = true;
+  }
+
+  if (needsRedraw) {
+    drawThermostatUI(currentTemp);
+  }
+}
+
+bool handleButtons() {
+  bool changed = false;
+
+  bool upState = digitalRead(btnUpPin);
+  bool downState = digitalRead(btnDownPin);
+  bool modeState = digitalRead(btnModePin);
+
+  if (lastUpState == HIGH && upState == LOW) {
+    targetTemp += 0.5;
+    if (targetTemp > 100.0) targetTemp = 100.0;
+    changed = true;
+  }
+
+  if (lastDownState == HIGH && downState == LOW) {
+    targetTemp -= 0.5;
+    if (targetTemp < 2.0) targetTemp = 2.0;
+    changed = true;
+  }
+
+  if (lastModeState == HIGH && modeState == LOW) {
+    coolingMode = !coolingMode;
+    relayState = false;
+    changed = true;
+  }
+
+  lastUpState = upState;
+  lastDownState = downState;
+  lastModeState = modeState;
+
+  if (changed) updateThermostatLogic();
+  return changed;
+}
+
+void updateThermostatLogic() {
+  if (currentTemp >= alarmThreshold) {
+    alarmActive = true;
+  } else if (currentTemp <= alarmThreshold - 0.5) {
+    alarmActive = false;
+  }
+
+  if (coolingMode) {
+    if (currentTemp >= targetTemp + hysteresis) {
+      relayState = true;
+    } else if (currentTemp <= targetTemp - hysteresis) {
+      relayState = false;
+    }
+  } else {
+    if (alarmActive) {
+      relayState = false;
+    } else if (currentTemp <= targetTemp - hysteresis) {
+      relayState = true;
+    } else if (currentTemp >= targetTemp + hysteresis) {
+      relayState = false;
+    }
+  }
+  setRelay(relayState);
+}
+
+float readTemperature() {
+  uint16_t totalADC = 0;
+  for (byte i = 0; i < 8; i++) {
+    totalADC += analogRead(lm35Pin);
+  }
+  return ((totalADC / 8.0) * 500.0) / 1024.0;
+}
+
+void setRelay(bool state) {
+  if (relayActiveLow) {
+    digitalWrite(relayPin, state ? LOW : HIGH);
+  } else {
+    digitalWrite(relayPin, state ? HIGH : LOW);
+  }
+}
+
+void drawThermostatUI(float temp) {
+  display.clearDisplay();
+
+  // Üst Bar
+  display.setTextSize(1);
+  if (coolingMode) {
+    display.fillRect(0, 0, 52, 11, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+    display.setCursor(4, 2);
+    display.print(F("SOGUTMA"));
+    display.setTextColor(SSD1306_WHITE);
+  } else {
+    display.drawRect(0, 0, 52, 11, SSD1306_WHITE);
+    display.setCursor(7, 2);
+    display.print(F("ISITMA"));
+  }
+
+  display.setCursor(62, 2);
+  display.print(F("Hdf:"));
+  display.print(targetTemp, 1);
+  display.print((char)247);
+
+  // Orta Alan
+  display.setTextSize(3);
+  display.setCursor(4, 17);
+  display.print(temp, 1);
+  display.setTextSize(2);
+  display.print((char)247);
+  display.print(F("C"));
+
+  // Alt Alan
+  display.drawLine(0, 44, 128, 44, SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 51);
+
+  if (alarmActive) {
+    display.print(F("! YUKSEK SICAKLIK !"));
+    if (buzzerBeepState) {
+      display.drawBitmap(110, 47, warning_icon, 16, 16, SSD1306_WHITE);
+    }
+  } 
+  else if (coolingMode) {
+    display.print(F("FAN: "));
+    display.print(relayState ? F("CALISIYOR") : F("BEKLEMEDE"));
+    display.drawBitmap(108, 47, (relayState && animFrame) ? fan_frame2 : fan_frame1, 16, 16, SSD1306_WHITE);
+  } 
+  else {
+    display.print(F("ISITICI: "));
+    display.print(relayState ? F("AKTIF") : F("KAPALI"));
+    if (relayState) {
+      display.drawBitmap(108, 47, animFrame ? flame_frame2 : flame_frame1, 16, 16, SSD1306_WHITE);
+    } else {
+      display.drawBitmap(108, 47, flame_idle, 16, 16, SSD1306_WHITE);
+    }
+  }
+
+  display.display();
+}
